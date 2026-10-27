@@ -12,11 +12,12 @@ https://claude.ai/artifact/WvSynLUJBi3ZcVcA8epopd
 ## Mettre à jour le site (« mets à jour le carnet »)
 1. Exporter les jours : outil ArtifactData, action `list`, url de l'artifact, collection `days`, `out_dir` = un dossier de travail (ex. `export`).
 2. Récupérer chaque photo citée qui manque dans `photos/` : outil Artifact, action `read`, url de l'artifact, `path` = id de l'asset. Copier le fichier obtenu en `photos/<id>.jpg`.
-3. Lancer `CARNET_MDP=<mot de passe> python3 build.py <carnet.html> export/days <dossier_photos> .`
+3. Corriger les fautes (orthographe, accents, apostrophes, grammaire) des champs `title` et `text` dans les fichiers exportés, sans réécrire le style de Baptiste. La correction ne vaut que pour le site : ne pas modifier la base de l'artifact. Signaler les corrections dans la réponse.
+4. Lancer `CARNET_MDP=<mot de passe> python3 build.py <carnet.html> export/days <dossier_photos> .`
    - Le mot de passe n'est jamais écrit dans le dépôt (public) : le demander à Baptiste s'il n'est pas connu.
    - `<carnet.html>` : la page de l'artifact (Artifact action `read`, fichier sauvegardé) **sans** le squelette `<!doctype>…<body>` ajouté par claude.ai : garder seulement ce qui est entre `<body>` et `</body>`.
    - Le script rechiffre toujours la page et `data.bin`, et chiffre seulement les photos absentes de `photos/`.
-4. Commit sur `main` avec un message du type « Carnet : jours du 27 au 29 oct. ».
+5. Commit sur `main` avec un message du type « Carnet : jours du 27 au 29 oct. ».
 
 ## Mot de passe
 Le site est chiffré (AES-256-GCM, clé dérivée du mot de passe en minuscules par PBKDF2 avec `sel.txt`).
