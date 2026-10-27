@@ -33,5 +33,6 @@ Le site est chiffré (AES-256-GCM, clé dérivée du mot de passe en minuscules 
 - `data.bin` : `{"days": [{date, place, placeJp, region, lat, lng, title, text, photos:[{id,w,h}]}]}`, chiffré.
 - `photos/<id>.bin` : photos JPEG chiffrées (déjà réduites à 2048 px par l'artifact).
 - `sw.js`, `sel.txt` : voir « Mot de passe ».
+- `apple-touch-icon.png` (180 px, écran d'accueil iPhone, nom « Japon ») et `favicon.png` : icône soleil, Fuji et torii.
 - `robots.txt` + balise `noindex` : site hors des moteurs de recherche.
 - `build.py` : construit le site à partir d'un export.
