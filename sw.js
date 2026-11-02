@@ -26,4 +26,6 @@ self.addEventListener('fetch',e=>{
   if(rel==='data.json') return e.respondWith(serve(base+'data.bin','application/json','no-store'));
   const m=rel.match(/^photos\/([0-9a-f]+)\.jpg$/);
   if(m) return e.respondWith(serve(base+'photos/'+m[1]+'.bin','image/jpeg','default'));
+  const v=rel.match(/^videos\/([0-9a-f]+)\.mp4$/);
+  if(v) return e.respondWith(serve(base+'videos/'+v[1]+'.bin','video/mp4','default'));
 });

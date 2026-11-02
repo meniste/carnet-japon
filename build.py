@@ -8,10 +8,13 @@ Usage : CARNET_MDP=<mot de passe> python3 build.py <carnet.html> <dossier_jours_
 
 Chiffrement : AES-256-GCM, clé = PBKDF2-SHA256(mot de passe en minuscules, sel, 300 000 itérations).
 Le sel est fixe (sel.txt) pour que les appareils déjà connectés le restent après chaque mise à jour.
-Fichiers publiés : index.html (écran de mot de passe + page chiffrée), sw.js (déchiffre data.json et
-les photos à la volée), data.bin, photos/<id>.bin. Aucun texte ni photo n'est publié en clair.
+Fichiers publiés : index.html (écran de mot de passe + page chiffrée), sw.js (déchiffre data.json,
+les photos et les vidéos à la volée), data.bin, photos/<id>.bin, videos/<id>.bin.
+Les vidéos (fichier source <id>.mp4/.webm/.mov dans dossier_photos) sont réencodées par ffmpeg en MP4
+H.264 720p avant chiffrement ; leur image d'aperçu (poster) est une photo comme les autres.
+Aucun texte, photo ni vidéo n'est publié en clair.
 """
-import base64, glob, json, os, sys
+import base64, glob, json, os, subprocess, sys, tempfile
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
@@ -151,10 +154,13 @@ self.addEventListener('fetch',e=>{
   if(rel==='data.json') return e.respondWith(serve(base+'data.bin','application/json','no-store'));
   const m=rel.match(/^photos\/([0-9a-f]+)\.jpg$/);
   if(m) return e.respondWith(serve(base+'photos/'+m[1]+'.bin','image/jpeg','default'));
+  const v=rel.match(/^videos\/([0-9a-f]+)\.mp4$/);
+  if(v) return e.respondWith(serve(base+'videos/'+v[1]+'.bin','video/mp4','default'));
 });
 '''
 
 os.makedirs(os.path.join(out, 'photos'), exist_ok=True)
+os.makedirs(os.path.join(out, 'videos'), exist_ok=True)
 gate = (GATE.replace('__SALT__', base64.b64encode(salt).decode())
             .replace('__ITER__', str(ITER)).replace('__PAGE__', page_b64))
 open(os.path.join(out, 'index.html'), 'w', encoding='utf-8').write(gate)
@@ -163,15 +169,24 @@ open(os.path.join(out, 'robots.txt'), 'w').write('User-agent: *\nDisallow: /\n')
 open(os.path.join(out, '.nojekyll'), 'w').write('')
 
 # ---- jours ----
-days, wanted = [], set()
+days, wanted, wanted_v = [], set(), set()
 for f in sorted(glob.glob(os.path.join(days_dir, '**', '*.json'), recursive=True)):
     d = json.load(open(f, encoding='utf-8'))
     d = d.get('data', d)  # accepte {data:{...}} ou le document brut
     if not d.get('date'):
         continue
     keep = {k: d.get(k) for k in ('date', 'place', 'placeJp', 'region', 'lat', 'lng', 'title', 'text')}
-    keep['photos'] = [{'id': p['id'], 'w': p.get('w'), 'h': p.get('h')} for p in d.get('photos') or []]
-    wanted.update(p['id'] for p in keep['photos'])
+    keep['photos'] = []
+    for p in d.get('photos') or []:
+        item = {'id': p['id'], 'w': p.get('w'), 'h': p.get('h')}
+        if p.get('type') == 'video':
+            item.update(type='video', poster=p.get('poster'), dur=p.get('dur'))
+            wanted_v.add(p['id'])
+            if p.get('poster'):
+                wanted.add(p['poster'])
+        else:
+            wanted.add(p['id'])
+        keep['photos'].append(item)
     days.append(keep)
 data = json.dumps({'days': days}, ensure_ascii=False).encode('utf-8')
 open(os.path.join(out, 'data.bin'), 'wb').write(enc(data))
@@ -194,4 +209,27 @@ for pid in sorted(wanted):
         missing.append(pid)
 for f in glob.glob(os.path.join(out, 'photos', '*.jpg')):  # plus aucune photo en clair
     os.remove(f)
-print(f'{len(days)} jours, {done} photos chiffrées, {len(missing)} manquantes')
+
+# ---- vidéos : réencodage MP4 H.264 720p puis chiffrement ----
+vdone = 0
+for vid in sorted(wanted_v):
+    dst = os.path.join(out, 'videos', vid + '.bin')
+    if os.path.exists(dst):
+        vdone += 1
+        continue
+    hits = [h for h in glob.glob(os.path.join(photos_dir, vid + '.*')) if not h.endswith('.bin')]
+    if not hits:
+        missing.append(vid)
+        continue
+    with tempfile.TemporaryDirectory() as tmp:
+        mp4 = os.path.join(tmp, 'v.mp4')
+        scale = "scale='if(gte(iw,ih),min(1280,iw),-2)':'if(gte(iw,ih),-2,min(1280,ih))'"
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', hits[0], '-map', '0:v:0', '-map', '0:a:0?',
+                        '-vf', scale, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26', '-pix_fmt', 'yuv420p',
+                        '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', mp4], check=True)
+        open(dst, 'wb').write(enc(open(mp4, 'rb').read()))
+    vdone += 1
+for f in glob.glob(os.path.join(out, 'videos', '*')):  # plus aucune vidéo en clair
+    if not f.endswith('.bin'):
+        os.remove(f)
+print(f'{len(days)} jours, {done} photos et {vdone} vidéos chiffrées, {len(missing)} manquantes')

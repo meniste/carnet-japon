@@ -7,11 +7,12 @@ Publié par GitHub Pages depuis `main` / racine : https://meniste.github.io/carn
 Baptiste écrit ses jours et ajoute ses photos dans l'artifact claude.ai « Carnet du Japon » :
 https://claude.ai/artifact/WvSynLUJBi3ZcVcA8epopd
 - Textes : base de données de l'artifact, collection `days` (un document par jour, id = date `AAAA-MM-JJ`).
-- Photos : assets de l'artifact ; chaque jour liste `photos: [{id, w, h}]`.
+- Photos et vidéos : assets de l'artifact ; chaque jour liste `photos: [{id, w, h}]`. Une vidéo est un élément
+  `{id, type:'video', poster, w, h, dur}` : `id` = la vidéo (MP4/WebM), `poster` = son image d'aperçu (JPEG).
 
 ## Mettre à jour le site (« mets à jour le carnet »)
 1. Exporter les jours : outil ArtifactData, action `list`, url de l'artifact, collection `days`, `out_dir` = un dossier de travail (ex. `export`).
-2. Récupérer chaque photo citée qui manque dans `photos/` : outil Artifact, action `read`, url de l'artifact, `path` = id de l'asset. Copier le fichier obtenu en `photos/<id>.jpg`.
+2. Récupérer chaque asset cité (photo, poster de vidéo, vidéo) qui manque dans `photos/` ou `videos/` (fichiers `.bin`) : outil Artifact, action `read`, url de l'artifact, `path` = id de l'asset. Mettre les fichiers obtenus dans un même dossier, sous leur nom `<id>.<ext>`.
 3. Corriger les fautes (orthographe, accents, apostrophes, grammaire) des champs `title` et `text` dans les fichiers exportés, sans réécrire le style de Baptiste. La correction ne vaut que pour le site : ne pas modifier la base de l'artifact. Signaler les corrections dans la réponse.
 4. Lancer `CARNET_MDP=<mot de passe> python3 build.py <carnet.html> export/days <dossier_photos> .`
    - Le mot de passe n'est jamais écrit dans le dépôt (public) : le demander à Baptiste s'il n'est pas connu.
@@ -32,7 +33,8 @@ Le site est chiffré (AES-256-GCM, clé dérivée du mot de passe en minuscules 
 ## Fichiers
 - `index.html` : écran de mot de passe ; la page déchiffrée est la même que l'artifact et, hors de claude.ai, charge `data.json` en lecture seule.
 - `data.bin` : `{"days": [{date, place, placeJp, region, lat, lng, title, text, photos:[{id,w,h}]}]}`, chiffré.
-- `photos/<id>.bin` : photos JPEG chiffrées (déjà réduites à 2048 px par l'artifact).
+- `photos/<id>.bin` : photos JPEG chiffrées (déjà réduites à 2048 px par l'artifact), y compris les posters des vidéos.
+- `videos/<id>.bin` : vidéos réencodées par `build.py` (ffmpeg, MP4 H.264 720p) puis chiffrées ; la page les lit en blob.
 - `sw.js`, `sel.txt` : voir « Mot de passe ».
 - `apple-touch-icon.png` (180 px, écran d'accueil iPhone, nom « Japon ») et `favicon.png` : icône soleil, Fuji et torii.
 - `robots.txt` + balise `noindex` : site hors des moteurs de recherche.
