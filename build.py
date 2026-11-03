@@ -14,7 +14,7 @@ Les vidéos (fichier source <id>.mp4/.webm/.mov dans dossier_photos) sont réenc
 H.264 720p avant chiffrement ; leur image d'aperçu (poster) est une photo comme les autres.
 Aucun texte, photo ni vidéo n'est publié en clair.
 """
-import base64, glob, json, os, subprocess, sys, tempfile
+import base64, glob, hashlib, json, os, subprocess, sys, tempfile
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
@@ -169,7 +169,7 @@ open(os.path.join(out, 'robots.txt'), 'w').write('User-agent: *\nDisallow: /\n')
 open(os.path.join(out, '.nojekyll'), 'w').write('')
 
 # ---- jours ----
-days, wanted, wanted_v = [], set(), set()
+days, wanted, wanted_v, gen_posters = [], set(), set(), {}
 for f in sorted(glob.glob(os.path.join(days_dir, '**', '*.json'), recursive=True)):
     d = json.load(open(f, encoding='utf-8'))
     d = d.get('data', d)  # accepte {data:{...}} ou le document brut
@@ -180,10 +180,13 @@ for f in sorted(glob.glob(os.path.join(days_dir, '**', '*.json'), recursive=True
     for p in d.get('photos') or []:
         item = {'id': p['id'], 'w': p.get('w'), 'h': p.get('h')}
         if p.get('type') == 'video':
-            item.update(type='video', poster=p.get('poster'), dur=p.get('dur'))
+            poster = p.get('poster')
+            if not poster:  # pas d'aperçu fourni par le téléphone : on le tire de la vidéo
+                poster = hashlib.md5((p['id'] + ':poster').encode()).hexdigest()
+                gen_posters[poster] = p['id']
+            item.update(type='video', poster=poster, dur=p.get('dur'))
             wanted_v.add(p['id'])
-            if p.get('poster'):
-                wanted.add(p['poster'])
+            wanted.add(poster)
         else:
             wanted.add(p['id'])
         keep['photos'].append(item)
@@ -202,6 +205,17 @@ for pid in sorted(wanted):
     if os.path.exists(dst):  # déjà chiffrée : on ne la réécrit pas
         done += 1
         continue
+    if not hits and pid in gen_posters:
+        vsrc = [h for h in glob.glob(os.path.join(photos_dir, gen_posters[pid] + '.*')) if not h.endswith('.bin')]
+        if vsrc:
+            with tempfile.TemporaryDirectory() as tmp:
+                jpg = os.path.join(tmp, 'p.jpg')
+                subprocess.run(['ffmpeg', '-v', 'error', '-y', '-ss', '0.3', '-i', vsrc[0], '-frames:v', '1',
+                                '-vf', "scale='if(gte(iw,ih),min(1280,iw),-2)':'if(gte(iw,ih),-2,min(1280,ih))'",
+                                '-q:v', '3', jpg], check=True)
+                open(dst, 'wb').write(enc(open(jpg, 'rb').read()))
+            done += 1
+            continue
     if hits:
         open(dst, 'wb').write(enc(open(hits[0], 'rb').read()))
         done += 1

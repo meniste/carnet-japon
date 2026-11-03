@@ -8,7 +8,8 @@ Baptiste écrit ses jours et ajoute ses photos dans l'artifact claude.ai « Carn
 https://claude.ai/artifact/WvSynLUJBi3ZcVcA8epopd
 - Textes : base de données de l'artifact, collection `days` (un document par jour, id = date `AAAA-MM-JJ`).
 - Photos et vidéos : assets de l'artifact ; chaque jour liste `photos: [{id, w, h}]`. Une vidéo est un élément
-  `{id, type:'video', poster, w, h, dur}` : `id` = la vidéo (MP4/WebM), `poster` = son image d'aperçu (JPEG).
+  `{id, type:'video', poster, w, h, dur}` : `id` = la vidéo (souvent le .mov de l'iPhone envoyé tel quel sous le type
+  video/mp4, parfois HEVC), `poster` = son image d'aperçu (JPEG), ou `null` : `build.py` la tire alors de la vidéo.
 
 ## Mettre à jour le site (« mets à jour le carnet »)
 1. Exporter les jours : outil ArtifactData, action `list`, url de l'artifact, collection `days`, `out_dir` = un dossier de travail (ex. `export`).
